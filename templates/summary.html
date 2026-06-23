@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+
+{% block title %}Study Notes{% endblock %}
+
+{% block content %}
+
+<div class="summary-page">
+
+    <!-- HEADER -->
+    <div class="summary-header">
+        <div class="summary-meta">
+            <a href="/" class="back-link">← Back</a>
+            <div>
+                <h1 class="summary-title">📝 Study Notes</h1>
+                <p class="summary-filename">{{ entry.filename }}</p>
+                <p class="summary-time">{{ entry.timestamp }}</p>
+            </div>
+        </div>
+
+        <!-- ACTION BUTTONS -->
+        <div class="action-buttons">
+            <a href="/chat_page" class="btn btn-outline">
+                💬 Ask Questions
+            </a>
+            <a href="/flashcard_page" class="btn btn-primary">
+                🃏 Flashcards
+            </a>
+        </div>
+    </div>
+
+    <!-- STUDY NOTES CONTENT -->
+    <div class="card notes-card">
+        <div id="notes-content" class="notes-content">
+            <!-- markdown rendered by JS -->
+        </div>
+    </div>
+
+    <!-- BOTTOM ACTION BUTTONS (for mobile) -->
+    <div class="bottom-actions">
+        <a href="/chat_page" class="btn btn-outline btn-full">
+            💬 Ask Questions About This
+        </a>
+        <a href="/flashcard_page" class="btn btn-primary btn-full">
+            🃏 Generate Flashcards
+        </a>
+    </div>
+
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+
+    const rawSummary = document.getElementById('raw-summary').textContent;
+
+    document.getElementById('notes-content').innerHTML =
+        marked.parse(rawSummary);
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+</script>
+{% endblock %}
