@@ -1,0 +1,229 @@
+{% extends 'base.html' %}
+
+{% block title %}Home{% endblock %}
+
+{% block content %}
+
+<div class="page-grid">
+
+    <div class="upload-column">
+
+        <div class="card">
+            <h1 class="page-title">Upload Your File</h1>
+            <p class="page-subtitle">
+                Get AI-powered exam notes, Q&A, and flashcards
+            </p>
+
+            <div class="upload-area" id="upload-area"
+                onclick="document.getElementById('file-input').click()">
+
+                <input type="file" id="file-input" hidden
+                    accept=".pdf,.docx,.txt,.pptx,.xlsx,.png,.jpg,.jpeg,.webp">
+
+                <div class="upload-icon">📄</div>
+                <p class="upload-text">Drag & drop or click to choose</p>
+                <p class="upload-hint">
+                    PDF, Word, PowerPoint, Excel, Text, Images
+                </p>
+                <p id="file-name" class="file-name"></p>
+            </div>
+
+            <button class="btn btn-primary" id="upload-btn"
+                onclick="uploadFile()">
+                ✨ Summarize & Study
+            </button>
+
+            <div id="upload-error" class="error-box" style="display:none"></div>
+        </div>
+
+        <div class="card loading-card" id="loading-card" style="display:none">
+            <div class="spinner"></div>
+            <p class="loading-text">Analyzing your file...</p>
+            <p class="loading-hint">
+                Generating detailed study notes. This may take a moment.
+            </p>
+        </div>
+
+    </div>
+
+
+    <div class="history-column">
+        <div class="card history-card">
+            <h2 class="history-title">📋 Recent Uploads</h2>
+            <div id="history-list">
+                <p class="empty-hint">No uploads yet.</p>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+
+document.getElementById('file-input')
+    .addEventListener('change', function () {
+    const file = this.files[0];
+    if (file) {
+        document.getElementById('file-name').textContent = '📄 ' + file.name;
+        document.getElementById('upload-area').classList.add('has-file');
+    }
+});
+
+const uploadArea = document.getElementById('upload-area');
+
+uploadArea.addEventListener('dragover', (e) => {
+    e.preventDefault();
+
+    uploadArea.classList.add('drag-over');
+});
+
+uploadArea.addEventListener('dragleave', () => {
+    uploadArea.classList.remove('drag-over');
+});
+
+uploadArea.addEventListener('drop', (e) => {
+    e.preventDefault();
+    uploadArea.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file) {
+
+        const dt = new DataTransfer();
+        dt.items.add(file);
+        document.getElementById('file-input').files = dt.files;
+        document.getElementById('file-name').textContent = '📄 ' + file.name;
+        uploadArea.classList.add('has-file');
+    }
+});
+
+
+function uploadFile() {
+    const fileInput = document.getElementById('file-input');
+    const file = fileInput.files[0];
+
+    if (!file) {
+        showError('Please choose a file first!');
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    document.getElementById('loading-card').style.display = 'block';
+    document.getElementById('upload-btn').disabled = true;
+    document.getElementById('upload-btn').textContent = 'Processing...';
+    hideError();
+
+    fetch('/upload', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => {
+        if (response.status === 413) {
+            throw new Error('File too large! Maximum size is 50MB.');
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.error) {
+            throw new Error(data.error);
+        }
+
+        window.location.href = '/summary';
+    })
+    .catch(error => {
+        document.getElementById('loading-card').style.display = 'none';
+        document.getElementById('upload-btn').disabled = false;
+        document.getElementById('upload-btn').textContent = '✨ Summarize & Study';
+        showError(error.message);
+    });
+}
+
+
+function loadHistory() {
+    fetch('/history')
+    .then(r => r.json())
+    .then(data => {
+        const list = document.getElementById('history-list');
+
+        if (!data.history || data.history.length === 0) {
+            list.innerHTML = '<p class="empty-hint">No uploads yet. Upload a file to get started!</p>';
+            return;
+        }
+
+        const items = [...data.history].reverse();
+        list.innerHTML = '';
+
+        items.forEach(entry => {
+            const item = document.createElement('div');
+            item.className = 'history-item';
+            item.innerHTML = `
+                <div class="history-info"
+                    onclick="loadEntry(${entry.id})">
+                    <div class="history-filename">
+                        📄 ${entry.filename}
+                    </div>
+                    <div class="history-time">
+                        ${entry.timestamp}
+                    </div>
+                </div>
+                <button class="delete-btn"
+                    onclick="deleteEntry(${entry.id})"
+                    title="Delete">
+                    🗑️
+                </button>
+            `;
+            list.appendChild(item);
+        });
+    });
+}
+
+function loadEntry(id) {
+    fetch('/load_entry', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: id })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.error) {
+            alert('❌ ' + data.error);
+            return;
+        }
+
+        window.location.href = '/summary';
+    });
+}
+
+function deleteEntry(id) {
+    if (!confirm('Delete this entry from history?')) return;
+
+    fetch('/delete_entry', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: id })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            loadHistory(); 
+        }
+    });
+}
+
+
+function showError(message) {
+    const box = document.getElementById('upload-error');
+    box.textContent = '❌ ' + message;
+    box.style.display = 'block';
+}
+
+function hideError() {
+    document.getElementById('upload-error').style.display = 'none';
+}
+
+window.onload = loadHistory;
+</script>
+{% endblock %}
