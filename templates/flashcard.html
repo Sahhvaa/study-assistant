@@ -1,0 +1,204 @@
+{% extends 'base.html' %}
+
+{% block title %}Flashcards{% endblock %}
+
+{% block content %}
+
+<div class="flashcards-page">
+
+    <div class="flashcards-header">
+        <div class="flashcards-meta">
+            <a href="/summary" class="back-link">← Back to Notes</a>
+            <div>
+                <h1 class="flashcards-title">🃏 Flashcards</h1>
+                <p class="flashcards-filename">{{ entry.filename }}</p>
+            </div>
+        </div>
+        <a href="/chat_page" class="btn btn-outline">
+            💬 Ask Questions
+        </a>
+    </div>
+
+    <div class="card generate-card" id="generate-card">
+        <div class="generate-content">
+            <div class="generate-icon">🃏</div>
+            <h2>Generate Flashcards</h2>
+            <p>AI will create 15 exam-focused flashcards from your document.</p>
+            <button class="btn btn-primary"
+                id="generate-btn" onclick="generateCards()">
+                ✨ Generate Flashcards
+            </button>
+        </div>
+    </div>
+
+    <div class="card loading-card" id="loading-card" style="display:none">
+        <div class="spinner"></div>
+        <p class="loading-text">Creating flashcards...</p>
+        <p class="loading-hint">This may take a moment.</p>
+    </div>
+
+    <div class="score-bar" id="score-bar" style="display:none">
+        <div class="score-info">
+            <span id="score-text">0 / 0 correct</span>
+            <span class="score-hint">Click cards to flip • Mark if you knew it</span>
+        </div>
+        <div class="score-buttons">
+            <button class="btn btn-outline"
+                onclick="resetCards()">🔄 Reset</button>
+            <button class="btn btn-primary"
+                onclick="generateCards()">✨ Regenerate</button>
+        </div>
+    </div>
+
+    <div class="flashcard-grid" id="flashcard-grid"></div>
+
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+let totalCards = 0;
+let correctCount = 0;
+let cardData = [];
+
+function generateCards() {
+    document.getElementById('generate-card').style.display = 'none';
+    document.getElementById('loading-card').style.display = 'block';
+    document.getElementById('score-bar').style.display = 'none';
+    document.getElementById('flashcard-grid').innerHTML = '';
+
+    fetch('/generate_cards', { method: 'POST' })
+    .then(r => r.json())
+    .then(data => {
+        document.getElementById('loading-card').style.display = 'none';
+
+        if (data.error) {
+            document.getElementById('generate-card').style.display = 'block';
+            alert('❌ ' + data.error);
+            return;
+        }
+
+        cardData = data.flashcards;
+        totalCards = cardData.length;
+        correctCount = 0;
+
+        renderCards(cardData);
+        updateScore();
+
+        document.getElementById('score-bar').style.display = 'flex';
+    })
+    .catch(() => {
+        document.getElementById('loading-card').style.display = 'none';
+        document.getElementById('generate-card').style.display = 'block';
+        alert('❌ Something went wrong. Please try again.');
+    });
+}
+
+function renderCards(cards) {
+    const grid = document.getElementById('flashcard-grid');
+    grid.innerHTML = '';
+
+    cards.forEach((card, index) => {
+        const cardEl = document.createElement('div');
+        cardEl.className = 'flashcard';
+        cardEl.id = 'card-' + index;
+        cardEl.dataset.flipped = 'false';
+        cardEl.dataset.marked = 'false';
+
+        cardEl.innerHTML = `
+            <div class="flashcard-inner">
+
+                <!-- FRONT — question -->
+                <div class="flashcard-front">
+                    <div class="card-label">Question ${index + 1}</div>
+                    <div class="card-text">${card.question}</div>
+                    <div class="card-tap-hint">Tap to reveal answer</div>
+                </div>
+
+                <!-- BACK — answer -->
+                <div class="flashcard-back">
+                    <div class="card-label">Answer</div>
+                    <div class="card-text">${card.answer}</div>
+                    <div class="card-actions">
+                        <button class="knew-btn"
+                            onclick="markCard(event, ${index}, true)">
+                            ✅ Got it!
+                        </button>
+                        <button class="didnt-btn"
+                            onclick="markCard(event, ${index}, false)">
+                            ❌ Not yet
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        `;
+
+        cardEl.addEventListener('click', () => flipCard(index));
+        grid.appendChild(cardEl);
+    });
+}
+
+function flipCard(index) {
+    const card = document.getElementById('card-' + index);
+    const isFlipped = card.dataset.flipped === 'true';
+
+    if (isFlipped) {
+        card.classList.remove('flipped');
+        card.dataset.flipped = 'false';
+    } else {
+        card.classList.add('flipped');
+        card.dataset.flipped = 'true';
+    }
+}
+
+function markCard(event, index, knew) {
+
+    event.stopPropagation();
+
+    const card = document.getElementById('card-' + index);
+    const wasMarked = card.dataset.marked !== 'false';
+
+    if (wasMarked) {
+        const wasCorrect = card.dataset.marked === 'true';
+        if (wasCorrect) correctCount--;
+        card.dataset.marked = 'false';
+        card.classList.remove('card-correct', 'card-wrong');
+    } else {
+
+        card.dataset.marked = String(knew);
+        if (knew) {
+            correctCount++;
+            card.classList.add('card-correct');
+            card.classList.remove('card-wrong');
+        } else {
+            card.classList.add('card-wrong');
+            card.classList.remove('card-correct');
+        }
+    }
+
+    updateScore();
+}
+
+function updateScore() {
+    const marked = document.querySelectorAll(
+        '.flashcard[data-marked="true"], .flashcard[data-marked="false"]:not([data-marked="false"])'
+    ).length;
+
+    document.getElementById('score-text').textContent =
+        `${correctCount} / ${totalCards} correct`;
+}
+
+function resetCards() {
+    correctCount = 0;
+
+    document.querySelectorAll('.flashcard').forEach(card => {
+        card.classList.remove('flipped', 'card-correct', 'card-wrong');
+        card.dataset.flipped = 'false';
+        card.dataset.marked = 'false';
+    });
+    updateScore();
+}
+</script>
+{% endblock %}
