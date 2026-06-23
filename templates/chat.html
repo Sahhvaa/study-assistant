@@ -1,0 +1,190 @@
+{% extends 'base.html' %}
+
+{% block title %}Ask Questions{% endblock %}
+
+{% block content %}
+
+<div class="chat-page">
+
+    <div class="chat-header">
+        <div class="chat-meta">
+            <a href="/summary" class="back-link">← Back to Notes</a>
+            <div>
+                <h1 class="chat-title">💬 Ask Questions</h1>
+                <p class="chat-filename">{{ entry.filename }}</p>
+            </div>
+        </div>
+        <a href="/flashcard_page" class="btn btn-outline">
+            🃏 Flashcards
+        </a>
+    </div>
+
+    <div class="card chat-card">
+
+        <div class="chat-history" id="chat-history">
+
+            <div class="bubble ai">
+                <div class="bubble-content">
+                    👋 Hi! I've read <strong>{{ entry.filename }}</strong>.
+                    Ask me anything about it — concepts, examples,
+                    exam questions, anything!
+                </div>
+            </div>
+        </div>
+
+        <div class="chat-input-area">
+            <input
+                type="text"
+                id="question-input"
+                class="chat-input"
+                placeholder="Ask a question about the document..."
+                onkeypress="handleKeyPress(event)"
+                autocomplete="off">
+            <button class="btn btn-primary send-btn"
+                id="send-btn" onclick="askQuestion()">
+                Send
+            </button>
+        </div>
+
+    </div>
+
+    <div class="card suggestions-card">
+        <h3 class="suggestions-title">💡 Try asking:</h3>
+        <div class="suggestions-grid">
+            <button class="suggestion-btn"
+                onclick="askSuggestion(this)">
+                Explain the main concept in simple terms
+            </button>
+            <button class="suggestion-btn"
+                onclick="askSuggestion(this)">
+                What are the most important points to remember?
+            </button>
+            <button class="suggestion-btn"
+                onclick="askSuggestion(this)">
+                Give me a real-world example of this
+            </button>
+            <button class="suggestion-btn"
+                onclick="askSuggestion(this)">
+                What exam questions might come from this?
+            </button>
+            <button class="suggestion-btn"
+                onclick="askSuggestion(this)">
+                What are common mistakes students make?
+            </button>
+            <button class="suggestion-btn"
+                onclick="askSuggestion(this)">
+                Summarize this in 5 bullet points
+            </button>
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+
+function handleKeyPress(event) {
+    if (event.key === 'Enter') {
+        askQuestion();
+    }
+}
+
+function askSuggestion(btn) {
+
+    document.getElementById('question-input').value = btn.textContent.trim();
+    askQuestion();
+}
+
+function askQuestion() {
+    const input = document.getElementById('question-input');
+    const question = input.value.trim();
+
+    if (!question) return;
+
+    addBubble(question, 'user');
+    input.value = '';
+
+    setLoading(true);
+
+    const thinkingId = addThinking();
+
+    fetch('/ask', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question: question })
+    })
+    .then(r => r.json())
+    .then(data => {
+
+        removeThinking(thinkingId);
+        setLoading(false);
+
+        if (data.error) {
+            addBubble('❌ ' + data.error, 'ai');
+            return;
+        }
+        addBubble(data.answer, 'ai', true);
+
+    })
+    .catch(() => {
+        removeThinking(thinkingId);
+        setLoading(false);
+        addBubble('❌ Something went wrong. Please try again.', 'ai');
+    });
+}
+
+function addBubble(text, sender, isMarkdown = false) {
+    const history = document.getElementById('chat-history');
+    const bubble = document.createElement('div');
+    bubble.className = `bubble ${sender}`;
+
+    const content = document.createElement('div');
+    content.className = 'bubble-content';
+
+    if (isMarkdown) {
+        content.innerHTML = marked.parse(text);
+    } else {
+        content.textContent = text;
+    }
+
+    bubble.appendChild(content);
+    history.appendChild(bubble);
+
+    history.scrollTop = history.scrollHeight;
+}
+
+function addThinking() {
+ 
+    const history = document.getElementById('chat-history');
+    const id = 'thinking-' + Date.now();
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble ai thinking';
+    bubble.id = id;
+    bubble.innerHTML = `
+        <div class="bubble-content">
+            <span class="dot"></span>
+            <span class="dot"></span>
+            <span class="dot"></span>
+        </div>
+    `;
+    history.appendChild(bubble);
+    history.scrollTop = history.scrollHeight;
+    return id;
+}
+
+function removeThinking(id) {
+    const el = document.getElementById(id);
+    if (el) el.remove();
+}
+
+function setLoading(loading) {
+    const input = document.getElementById('question-input');
+    const btn = document.getElementById('send-btn');
+    input.disabled = loading;
+    btn.disabled = loading;
+    btn.textContent = loading ? '...' : 'Send';
+}
+</script>
+{% endblock %}
