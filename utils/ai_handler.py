@@ -2,11 +2,13 @@ import requests
 import json
 import os
 import base64
+import time
 from pathlib import Path
 from dotenv import load_dotenv
 
 load_dotenv()
 
+# --- Configuration ---
 PROVIDER = os.getenv('AI_PROVIDER', 'groq').lower()
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 GROQ_API_KEY = os.getenv('GROQ_API_KEY')
@@ -23,11 +25,13 @@ GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
 print(f"✅ AI Provider: {PROVIDER.upper()} | Model: {GROQ_MODEL if PROVIDER == 'groq' else GEMINI_MODEL}")
 
 
+# ─────────────────────────────────────────
+# API CALLERS
+# ─────────────────────────────────────────
 
 def call_gemini(prompt, filepath=None):
     """Call Gemini — handles both text and images."""
     if filepath:
-        # convert image to base64
         with open(filepath, 'rb') as f:
             image_data = base64.b64encode(f.read()).decode('utf-8')
         ext = Path(filepath).suffix.lower().lstrip('.')
@@ -40,7 +44,7 @@ def call_gemini(prompt, filepath=None):
         parts = [{'text': prompt}]
 
     payload = {'contents': [{'parts': parts}]}
-    response = requests.post(GEMINI_URL, json=payload, timeout=60)
+    response = requests.post(GEMINI_URL, json=payload, timeout=120)
     data = response.json()
 
     if 'error' in data:
@@ -50,7 +54,7 @@ def call_gemini(prompt, filepath=None):
 
 
 def call_groq(prompt):
-    """Call Groq — fast, free, text only."""
+    """Call Groq — fast, free, text only. Auto retries on rate limit."""
     headers = {
         'Authorization': f'Bearer {GROQ_API_KEY}',
         'Content-Type': 'application/json'
@@ -60,18 +64,29 @@ def call_groq(prompt):
         'messages': [{'role': 'user', 'content': prompt}],
         'max_tokens': 4096
     }
-    response = requests.post(
-        GROQ_URL,
-        json=payload,
-        headers=headers,
-        timeout=60
-    )
-    data = response.json()
 
-    if 'error' in data:
-        raise Exception(f"Groq Error: {data['error']['message']}")
+    for attempt in range(3):
+        # try up to 3 times
+        response = requests.post(
+            GROQ_URL,
+            json=payload,
+            headers=headers,
+            timeout=60
+        )
+        data = response.json()
 
-    return data['choices'][0]['message']['content']
+        if 'error' in data:
+            error_msg = data['error']['message']
+
+            if 'rate limit' in error_msg.lower() and attempt < 2:
+                # wait 20 seconds then retry
+                print(f"⏳ Rate limit hit. Waiting 20s... (attempt {attempt + 2}/3)")
+                time.sleep(20)
+                continue
+
+            raise Exception(f"Groq Error: {error_msg}")
+
+        return data['choices'][0]['message']['content']
 
 
 def call_ai(prompt, filepath=None):
@@ -88,63 +103,134 @@ def call_ai(prompt, filepath=None):
         return call_groq(prompt)
 
 
-def summarize(text=None, filepath=None):
-    """Generate detailed exam-ready study notes."""
-    doc_content = text[:20000] if text else ""
+def call_ai_with_images(prompt, image_paths):
+    """
+    Send text prompt along with multiple images to Gemini.
+    Used when we extract diagrams from PDFs.
+    """
+    parts = [{'text': prompt}]
 
-    prompt = f"""You are an expert university tutor creating exam-ready study notes.
+    # add each image (limit to 5 to avoid overloading)
+    for image_path in image_paths[:5]:
+        try:
+            with open(image_path, 'rb') as f:
+                image_data = base64.b64encode(f.read()).decode('utf-8')
+            ext = Path(image_path).suffix.lower().lstrip('.')
+            mime_type = 'image/jpeg' if ext in ['jpg', 'jpeg'] else f'image/{ext}'
+            parts.append({
+                'inline_data': {
+                    'mime_type': mime_type,
+                    'data': image_data
+                }
+            })
+        except Exception as e:
+            print(f"Could not add image {image_path}: {e}")
 
-Your goal is to help a student deeply understand this topic and score well in their exam.
+    payload = {'contents': [{'parts': parts}]}
+    response = requests.post(GEMINI_URL, json=payload, timeout=120)
+    data = response.json()
 
-Write like a brilliant senior student explaining to a classmate:
-- Be detailed and thorough — not oversimplified
-- Always include real-world examples that make abstract concepts click
-- Use analogies where helpful
-- Cover everything a student needs to know for their exam
+    if 'error' in data:
+        # fallback to text only if image sending fails
+        print(f"Image API error — falling back to text only")
+        return call_ai(prompt)
+
+    return data['candidates'][0]['content']['parts'][0]['text']
+
+
+# ─────────────────────────────────────────
+# MAIN FUNCTIONS
+# ─────────────────────────────────────────
+
+def summarize(text=None, filepath=None, image_paths=None):
+    """Generate comprehensive exam-ready study notes."""
+    doc_content = text[:30000] if text else ""
+
+    prompt = f"""You are a world-class university professor creating the most comprehensive exam study notes possible.
+
+Your job is to make sure the student NEVER needs to open the original document again.
+Cover EVERY SINGLE topic, definition, concept, formula, diagram, and comparison mentioned.
+
+CRITICAL RULES:
+- Do NOT skip any topic no matter how small
+- Do NOT miss any definition — list ALL of them
+- Create detailed comparison tables wherever two or more things are being compared
+- Recreate any diagrams as ASCII art or structured text representations
+- Use real-world examples for EVERY concept
+- Write for a smart university student — detailed but clear
 
 Structure your notes EXACTLY like this:
 
-## 📌 What This Is About
-A clear introduction explaining what this topic covers, its importance, and real-world applications.
+## 📌 Document Overview
+What this document covers, why each topic matters, and real-world applications.
 
-## 📚 Core Concepts — Deep Explanation
+## 📚 Complete Topic Coverage
 
-For EACH major concept:
-### [Concept Name]
-**What it is:** Clear, detailed explanation
+For EVERY topic in the document create a section:
 
-**How it works:** Step-by-step breakdown if needed
+### [Topic Name]
+**📖 Definition:** Clear complete definition
 
-**Real-world example:** A concrete example from everyday life, industry, or science that makes this concept easy to visualize and remember
+**🔍 Detailed Explanation:**
+Thorough explanation. How it works, why it exists, what problem it solves.
 
-**What you must remember:** The key insight about this concept
+**💡 Real-World Example:**
+A concrete example from everyday life or industry that makes this click.
 
-## 🔑 Key Terms & Definitions
-List every important term with a clear definition and a one-line example.
+**🔗 How It Connects:**
+How this topic relates to other concepts in the document.
 
-## 📐 Formulas, Rules & Theorems
-(Skip if not applicable)
-For each formula/rule:
+---
+
+## 📊 Comparison Tables
+For EVERY pair or group of concepts that can be compared, create a detailed table:
+
+| Feature | Concept A | Concept B |
+|---------|-----------|-----------|
+| Definition | ... | ... |
+| How it works | ... | ... |
+| Use Case | ... | ... |
+| Advantages | ... | ... |
+| Disadvantages | ... | ... |
+| Example | ... | ... |
+
+Create a separate table for every comparison in the document.
+
+## 🔷 Diagrams & Visual Representations
+Recreate EVERY diagram, flowchart, or visual from the document.
+
+For flowcharts use this format:
+For hierarchies use indented lists:
+## 🔑 Complete Definitions Glossary
+EVERY term defined in the document:
+
+| Term | Definition | Example |
+|------|-----------|---------|
+| ... | ... | ... |
+
+## 📐 Formulas, Algorithms & Rules
+For EVERY formula or algorithm:
 - Write it clearly
-- Explain what each variable/component means
-- Show a worked example
-- State when to use it
-
-## 🔗 How Concepts Connect
-Explain how the different topics in this document relate to each other. Draw connections a student might miss.
+- Explain each variable or component
+- Show a complete worked example step by step
+- State exactly when to use it
 
 ## ⚠️ Common Exam Mistakes
-List specific mistakes students make and how to avoid them.
+Specific mistakes students make on each topic with corrections.
 
 ## 🎯 Expected Exam Questions & Model Answers
-Give 5 likely exam questions with thorough model answers that would score full marks.
+10 likely exam questions covering ALL major topics with complete model answers.
 
-## ✅ Last-Minute Revision Checklist
-Bullet list of the absolute must-know points before walking into the exam.
+## ✅ Complete Revision Checklist
+Every single concept the student must know before the exam.
 
 ---
 Document Content:
 {doc_content}"""
+
+    # use images if extracted from PDF
+    if image_paths:
+        return call_ai_with_images(prompt, image_paths)
 
     return call_ai(prompt, filepath=filepath)
 
@@ -153,18 +239,19 @@ def chat(question, text=None, filepath=None):
     """Answer a question about the document like an expert tutor."""
     doc_content = text[:20000] if text else ""
 
-    prompt = f"""You are an expert tutor helping a student understand their study material.
+    prompt = f"""You are an expert university tutor helping a student understand their study material.
 
 Answer this question thoroughly and clearly:
 
 Question: {question}
 
-Guidelines for your answer:
+Guidelines:
 - Give a detailed explanation — not just a one-line answer
 - Use a real-world example or analogy to make it memorable
 - If it involves calculation or steps, show them clearly
-- If it is a conceptual question, explain the WHY behind it
-- End with a one-line "Key Takeaway" that summarizes the core point
+- If it is conceptual, explain the WHY behind it
+- If relevant, mention how this connects to other topics
+- End with a "💡 Key Takeaway" that summarizes the core point in one line
 
 ---
 Document Content:
@@ -175,26 +262,27 @@ Document Content:
 
 def generate_flashcards(text=None, filepath=None):
     """Generate exam-focused flashcards."""
-    doc_content = text[:20000] if text else ""
+    doc_content = text[:10000] if text else ""
+    # reduced to 10000 to stay within rate limits
 
     prompt = f"""You are an exam preparation expert creating flashcards for a university student.
 
-Create 15 high-quality flashcards from this document.
+Create 10 high-quality flashcards from this document.
 
 Focus on:
 - Key definitions that must be memorized
 - Important concepts and how they work
 - Formulas or rules with brief explanations
-- Common exam topics and tricky questions
-- Concepts that are commonly misunderstood
+- Topics most likely to appear in exams
+- Concepts commonly misunderstood
 
 Rules for answers:
-- Make answers detailed enough to actually teach the concept
-- 2-4 sentences per answer — not too short, not too long
-- Include a mini example in the answer where helpful
+- 2-3 sentences maximum per answer
+- Include a mini example where helpful
+- Make it clear enough to teach the concept
 
 Return ONLY a valid JSON array.
-No extra text, no explanation, no markdown formatting whatsoever.
+No extra text, no explanation, no markdown.
 Start directly with [ and end with ]
 
 [{{"question": "...", "answer": "..."}}]
@@ -204,10 +292,42 @@ Document Content:
 
     raw = call_ai(prompt, filepath=filepath).strip()
 
-   
+    # clean markdown if AI wraps in code blocks
     if raw.startswith('```'):
         raw = raw.split('```')[1]
         if raw.startswith('json'):
             raw = raw[4:]
 
     return json.loads(raw.strip())
+
+def call_ai_with_images(prompt, image_paths):
+    """Send text prompt along with multiple images to Gemini."""
+    parts = [{'text': prompt}]
+
+    # add each image
+    for image_path in image_paths[:5]:
+        # limit to 5 images to avoid overloading
+        try:
+            with open(image_path, 'rb') as f:
+                image_data = base64.b64encode(f.read()).decode('utf-8')
+            ext = Path(image_path).suffix.lower().lstrip('.')
+            mime_type = 'image/jpeg' if ext in ['jpg', 'jpeg'] else f'image/{ext}'
+            parts.append({
+                'inline_data': {
+                    'mime_type': mime_type,
+                    'data': image_data
+                }
+            })
+        except Exception as e:
+            print(f"Could not add image {image_path}: {e}")
+
+    payload = {'contents': [{'parts': parts}]}
+    response = requests.post(GEMINI_URL, json=payload, timeout=120)
+    data = response.json()
+
+    if 'error' in data:
+        # fallback to text only if image sending fails
+        print(f"Image API error: {data['error']['message']} — falling back to text only")
+        return call_ai(prompt)
+
+    return data['candidates'][0]['content']['parts'][0]['text']

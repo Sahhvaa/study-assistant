@@ -51,12 +51,23 @@
 
 {% block scripts %}
 <script>
-
-    const rawSummary = document.getElementById('raw-summary').textContent;
-
-    document.getElementById('notes-content').innerHTML =
-        marked.parse(rawSummary);
-
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    // fetch summary via API instead of template injection
+    // this handles ALL special characters safely
+    fetch('/get_summary')
+    .then(r => r.json())
+    .then(data => {
+        if (data.error) {
+            document.getElementById('notes-content').innerHTML =
+                '<p style="color:#718096">Could not load summary.</p>';
+            return;
+        }
+        document.getElementById('notes-content').innerHTML =
+            marked.parse(data.summary);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    })
+    .catch(() => {
+        document.getElementById('notes-content').innerHTML =
+            '<p style="color:#c53030">Something went wrong loading the notes.</p>';
+    });
 </script>
 {% endblock %}

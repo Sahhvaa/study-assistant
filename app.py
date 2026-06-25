@@ -84,14 +84,6 @@ def flashcard_page():
 
 @app.route('/upload', methods=['POST'])
 def upload():
-    """
-    Handle file upload:
-    1. Save file to uploads/
-    2. Extract text
-    3. Generate summary
-    4. Save to history
-    5. Return success
-    """
     if 'file' not in request.files:
         return jsonify({'error': 'No file uploaded'}), 400
 
@@ -104,15 +96,18 @@ def upload():
         return jsonify({'error': 'File type not supported!'}), 400
 
     try:
-
-        filepath = os.path.join(
-            app.config['UPLOAD_FOLDER'],
-            file.filename
-        )
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
         file.save(filepath)
 
         text = extract_text(filepath)
         img = is_image(filepath)
+
+        # extract images from PDF for diagram analysis
+        image_paths = []
+        if filepath.lower().endswith('.pdf'):
+            from utils.file_handler import extract_images_from_pdf
+            image_paths = extract_images_from_pdf(filepath)
+            print(f"📸 Extracted {len(image_paths)} images from PDF")
 
         text_id = str(uuid.uuid4())
         text_store[text_id] = {
@@ -122,8 +117,11 @@ def upload():
         }
         session['text_id'] = text_id
 
+        # generate summary with images if available
         if img:
             notes = summarize(filepath=filepath)
+        elif image_paths:
+            notes = summarize(text=text, image_paths=image_paths)
         else:
             notes = summarize(text=text)
 
@@ -135,50 +133,8 @@ def upload():
         )
 
         session['entry_id'] = entry['id']
-
         return jsonify({'success': True})
 
-
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/ask', methods=['POST'])
-def ask():
-    """Answer a question about the document."""
-    data = request.get_json()
-    question = data.get('question', '').strip()
-
-    if not question:
-        return jsonify({'error': 'Please type a question!'}), 400
-
-    stored = get_stored_data()
-    if not stored:
-        return jsonify({'error': 'Please upload a file first!'}), 400
-
-    try:
-        if stored['is_image']:
-            answer = chat(question, filepath=stored['filepath'])
-        else:
-            answer = chat(question, text=stored['text'])
-        return jsonify({'answer': answer})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/generate_cards', methods=['POST'])
-def generate_cards():
-    """Generate flashcards from the document."""
-    stored = get_stored_data()
-    if not stored:
-        return jsonify({'error': 'Please upload a file first!'}), 400
-
-    try:
-        if stored['is_image']:
-            cards = generate_flashcards(filepath=stored['filepath'])
-        else:
-            cards = generate_flashcards(text=stored['text'])
-        return jsonify({'flashcards': cards})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -240,6 +196,16 @@ def delete_entry():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/get_summary')
+def get_summary():
+    entry_id = session.get('entry_id')
+    if not entry_id:
+        return jsonify({'error': 'No entry'}), 400
+    entry = get_entry(entry_id)
+    if not entry:
+        return jsonify({'error': 'Not found'}), 404
+    return jsonify({'summary': entry['summary']})
+
 
 def get_stored_data():
     """
@@ -275,3 +241,4 @@ if __name__ == '__main__':
     os.makedirs('uploads', exist_ok=True)
     os.makedirs('data', exist_ok=True)
     app.run(debug=True, use_reloader=False)
+
