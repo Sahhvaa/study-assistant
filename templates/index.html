@@ -63,6 +63,66 @@
 {% block scripts %}
 <script>
 
+    // ===== SYLLABUS =====
+
+function loadSyllabus() {
+    fetch('/get_syllabus')
+    .then(r => r.json())
+    .then(data => {
+        if (data.syllabus && data.syllabus.trim()) {
+            // syllabus exists — show saved bar
+            document.getElementById('syllabus-input').value = data.syllabus;
+            document.getElementById('syllabus-saved-bar').style.display = 'block';
+            document.getElementById('syllabus-edit-area').style.display = 'none';
+        }
+    });
+}
+
+function saveSyllabus() {
+    const syllabus = document.getElementById('syllabus-input').value.trim();
+
+    if (!syllabus) {
+        document.getElementById('syllabus-error').textContent = '❌ Please paste your syllabus first!';
+        document.getElementById('syllabus-error').style.display = 'block';
+        return;
+    }
+
+    const btn = document.getElementById('save-syllabus-btn');
+    btn.textContent = 'Saving...';
+    btn.disabled = true;
+
+    fetch('/save_syllabus', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ syllabus: syllabus })
+    })
+    .then(r => r.json())
+    .then(data => {
+        btn.textContent = '💾 Save Syllabus';
+        btn.disabled = false;
+
+        if (data.error) {
+            document.getElementById('syllabus-error').textContent = '❌ ' + data.error;
+            document.getElementById('syllabus-error').style.display = 'block';
+            return;
+        }
+
+        // show saved confirmation
+        document.getElementById('syllabus-saved-bar').style.display = 'block';
+        document.getElementById('syllabus-edit-area').style.display = 'none';
+        document.getElementById('syllabus-error').style.display = 'none';
+    });
+}
+
+function toggleSyllabusEdit() {
+    // show edit area again
+    document.getElementById('syllabus-edit-area').style.display = 'block';
+    document.getElementById('syllabus-saved-bar').style.display = 'none';
+}
+
+// load syllabus when page opens
+// add this inside window.onload
+
 document.getElementById('file-input')
     .addEventListener('change', function () {
     const file = this.files[0];
@@ -140,6 +200,47 @@ function uploadFile() {
         showError(error.message);
     });
 }
+
+<!-- ===== SYLLABUS SECTION ===== -->
+<div class="card syllabus-card">
+    <h2>📋 Exam Syllabus</h2>
+    <p class="page-subtitle">
+        Paste your syllabus so AI focuses only on exam topics
+    </p>
+
+    <div id="syllabus-saved-bar" style="display:none">
+        <div class="syllabus-saved">
+            ✅ Syllabus saved — AI will focus on these topics
+            <button class="edit-syllabus-btn"
+                onclick="toggleSyllabusEdit()">
+                Edit
+            </button>
+        </div>
+    </div>
+
+    <div id="syllabus-edit-area">
+        <textarea
+            id="syllabus-input"
+            class="syllabus-textarea"
+            placeholder="Paste your syllabus here...
+
+Example:
+Module 1: Foundations of Data Science
+- Introduction to Data Science
+- Properties of Data
+- Supervised and Unsupervised Learning
+- Data Science Process
+- Data Preparation
+- Modeling and Evaluation"></textarea>
+
+        <button class="btn btn-primary"
+            onclick="saveSyllabus()" id="save-syllabus-btn">
+            💾 Save Syllabus
+        </button>
+    </div>
+
+    <div id="syllabus-error" class="error-box" style="display:none"></div>
+</div>
 
 
 function loadHistory() {
@@ -224,6 +325,9 @@ function hideError() {
     document.getElementById('upload-error').style.display = 'none';
 }
 
-window.onload = loadHistory;
+window.onload = function() {
+    loadHistory();
+    loadSyllabus();
+}
 </script>
 {% endblock %}

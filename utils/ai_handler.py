@@ -145,30 +145,39 @@ def call_ai_with_images(prompt, image_paths):
     return data['candidates'][0]['content']['parts'][0]['text']
 
 
-# ─────────────────────────────────────────
-# MAIN FUNCTIONS
-# ─────────────────────────────────────────
-
-def summarize(text=None, filepath=None, image_paths=None):
-    """Generate comprehensive exam-ready study notes using Gemini."""
+def summarize(text=None, filepath=None, image_paths=None, syllabus=None):
+    """Generate syllabus-focused exam-ready study notes using Gemini."""
     doc_content = text[:80000] if text else ""
 
+    # build syllabus section of prompt
+    if syllabus and syllabus.strip():
+        syllabus_section = f"""
+SYLLABUS TO FOLLOW:
+The student's exam syllabus is provided below.
+ONLY cover topics that are mentioned in this syllabus.
+Ignore everything else in the document that is NOT in the syllabus.
+Give the most attention to topics that appear most prominently in the syllabus.
+
+{syllabus}
+
+---"""
+    else:
+        syllabus_section = """
+NOTE: No syllabus provided. Cover ALL topics in the document thoroughly.
+---"""
+
     prompt = f"""You are a brilliant senior student who just finished reading this entire document.
-You are now writing study notes for your classmates who have NO time to read the original.
+You are now writing exam study notes for your classmates.
+
+{syllabus_section}
 
 YOUR MISSION:
-Go through this document topic by topic and write notes that:
-- Cover EVERY SINGLE topic, EVERY definition, EVERY concept — absolutely nothing gets skipped
-- Are simplified enough to understand quickly but detailed enough to write correct exam answers
-- Include ALL diagrams, figures, charts, and tables recreated in text form
-- Feel like handwritten notes from the smartest student in class
-
-STRICT RULES:
-- Do NOT skip any topic — even small ones can appear in exams
-- Do NOT write "the document says..." — just write the content directly
+- Cover EVERY topic mentioned in the syllabus thoroughly
+- Skip topics NOT in the syllabus
+- Write notes detailed enough to score full marks in an exam
 - Keep all technical terms but explain them clearly
 - ALWAYS give a real-world example for each concept
-- Cover ALL worked problems and examples from the document with full solutions
+- Include ALL diagrams, figures, charts, and tables from the document
 
 ---
 
@@ -185,16 +194,13 @@ Use this format for each topic:
 **Key definition to memorize:**
 > [Exact definition formatted as a blockquote]
 
-[Cover each subtopic with the same level of detail]
-
 ---
 
 When you find a DIAGRAM or FIGURE recreate it:
 
 **📊 Figure: [Name]**
 [ASCII or text representation of the diagram]
-
-*What this shows: [Brief explanation of what the diagram means]*
+*What this shows: [Brief explanation]*
 
 ---
 
@@ -213,15 +219,12 @@ When items are COMPARED create a table:
 
 ---
 
-When you find FORMULAS or ALGORITHMS:
+When you find FORMULAS:
 
 **📐 Formula: [Name]**
-
 [Formula written clearly]
-
 Variables:
-- [Variable 1] = [what it means]
-- [Variable 2] = [what it means]
+- [Variable] = [meaning]
 
 **Example:** [Worked example step by step]
 
@@ -230,66 +233,36 @@ Variables:
 When you find WORKED PROBLEMS include them fully:
 
 **✏️ Problem: [Title]**
-
 Given: [what is given]
-
 Solution:
 - Step 1: [...]
 - Step 2: [...]
-
 Answer: [final answer]
 
 ---
 
-After covering ALL topics add these final sections:
+After covering ALL syllabus topics add:
 
 ## 📝 All Definitions at a Glance
 
 | Term | Definition |
 |------|-----------|
-| [every single term from document] | [clear definition] |
+| [every term covered] | [clear definition] |
 
 ## 🎯 What Will Definitely Come in the Exam
-[For each major topic write what type of question is likely to be asked]
+[For each syllabus topic write what type of question is likely]
 
 ## ✅ Must-Know Before the Exam
-[Bullet list of the most critical points — one line each]
+[Bullet list of most critical points]
 
 ---
 Document Content:
 {doc_content}"""
 
-    # always use Gemini for summarization
-    # Gemini has bigger context window and larger output than Groq
     if image_paths:
         return call_ai_with_images(prompt, image_paths)
 
     return call_gemini(prompt)
-
-
-def chat(question, text=None, filepath=None):
-    """Answer a question about the document like an expert tutor."""
-    doc_content = text[:20000] if text else ""
-
-    prompt = f"""You are an expert university tutor helping a student understand their study material.
-
-Answer this question thoroughly and clearly:
-
-Question: {question}
-
-Guidelines:
-- Give a detailed explanation — not just a one-line answer
-- Use a real-world example or analogy to make it memorable
-- If it involves calculation or steps, show them clearly
-- If it is conceptual, explain the WHY behind it
-- If relevant, mention how this connects to other topics
-- End with a "💡 Key Takeaway" that summarizes the core point in one line
-
----
-Document Content:
-{doc_content}"""
-
-    return call_ai(prompt, filepath=filepath)
 
 
 def generate_flashcards(text=None, filepath=None):
