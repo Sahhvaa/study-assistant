@@ -235,6 +235,37 @@ def get_stored_data():
 
     return stored
 
+SYLLABUS_FILE = 'data/syllabus.txt'
+
+@app.route('/save_syllabus', methods=['POST'])
+def save_syllabus():
+    """Save the syllabus to a file."""
+    data = request.get_json()
+    syllabus = data.get('syllabus', '').strip()
+
+    if not syllabus:
+        return jsonify({'error': 'Syllabus is empty!'}), 400
+
+    try:
+        os.makedirs('data', exist_ok=True)
+        with open(SYLLABUS_FILE, 'w', encoding='utf-8') as f:
+            f.write(syllabus)
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/get_syllabus', methods=['GET'])
+def get_syllabus():
+    """Get the saved syllabus."""
+    try:
+        if not os.path.exists(SYLLABUS_FILE):
+            return jsonify({'syllabus': ''})
+        with open(SYLLABUS_FILE, 'r', encoding='utf-8') as f:
+            return jsonify({'syllabus': f.read()})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 
 
 if __name__ == '__main__':

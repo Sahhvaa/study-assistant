@@ -22,7 +22,7 @@ GEMINI_URL = (
 )
 GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
 
-print(f"✅ AI Provider: {PROVIDER.upper()} | Model: {GROQ_MODEL if PROVIDER == 'groq' else GEMINI_MODEL}")
+print(f"✅ AI Provider: {PROVIDER.upper()} | Summarize: GEMINI | Chat/Cards: {GROQ_MODEL}")
 
 
 # ─────────────────────────────────────────
@@ -43,8 +43,15 @@ def call_gemini(prompt, filepath=None):
     else:
         parts = [{'text': prompt}]
 
-    payload = {'contents': [{'parts': parts}]}
-    response = requests.post(GEMINI_URL, json=payload, timeout=120)
+    payload = {
+        'contents': [{'parts': parts}],
+        'generationConfig': {
+            'maxOutputTokens': 8192,
+            'temperature': 0.3
+        }
+    }
+
+    response = requests.post(GEMINI_URL, json=payload, timeout=180)
     data = response.json()
 
     if 'error' in data:
@@ -66,7 +73,6 @@ def call_groq(prompt):
     }
 
     for attempt in range(3):
-        # try up to 3 times
         response = requests.post(
             GROQ_URL,
             json=payload,
@@ -77,13 +83,10 @@ def call_groq(prompt):
 
         if 'error' in data:
             error_msg = data['error']['message']
-
             if 'rate limit' in error_msg.lower() and attempt < 2:
-                # wait 20 seconds then retry
                 print(f"⏳ Rate limit hit. Waiting 20s... (attempt {attempt + 2}/3)")
                 time.sleep(20)
                 continue
-
             raise Exception(f"Groq Error: {error_msg}")
 
         return data['choices'][0]['message']['content']
@@ -105,12 +108,11 @@ def call_ai(prompt, filepath=None):
 
 def call_ai_with_images(prompt, image_paths):
     """
-    Send text prompt along with multiple images to Gemini.
-    Used when we extract diagrams from PDFs.
+    Send text prompt with multiple images to Gemini.
+    Used when diagrams are extracted from PDFs.
     """
     parts = [{'text': prompt}]
 
-    # add each image (limit to 5 to avoid overloading)
     for image_path in image_paths[:5]:
         try:
             with open(image_path, 'rb') as f:
@@ -126,14 +128,19 @@ def call_ai_with_images(prompt, image_paths):
         except Exception as e:
             print(f"Could not add image {image_path}: {e}")
 
-    payload = {'contents': [{'parts': parts}]}
-    response = requests.post(GEMINI_URL, json=payload, timeout=120)
+    payload = {
+        'contents': [{'parts': parts}],
+        'generationConfig': {
+            'maxOutputTokens': 8192,
+            'temperature': 0.3
+        }
+    }
+    response = requests.post(GEMINI_URL, json=payload, timeout=180)
     data = response.json()
 
     if 'error' in data:
-        # fallback to text only if image sending fails
         print(f"Image API error — falling back to text only")
-        return call_ai(prompt)
+        return call_gemini(prompt)
 
     return data['candidates'][0]['content']['parts'][0]['text']
 
@@ -143,96 +150,121 @@ def call_ai_with_images(prompt, image_paths):
 # ─────────────────────────────────────────
 
 def summarize(text=None, filepath=None, image_paths=None):
-    """Generate comprehensive exam-ready study notes."""
-    doc_content = text[:30000] if text else ""
+    """Generate comprehensive exam-ready study notes using Gemini."""
+    doc_content = text[:80000] if text else ""
 
-    prompt = f"""You are a world-class university professor creating the most comprehensive exam study notes possible.
+    prompt = f"""You are a brilliant senior student who just finished reading this entire document.
+You are now writing study notes for your classmates who have NO time to read the original.
 
-Your job is to make sure the student NEVER needs to open the original document again.
-Cover EVERY SINGLE topic, definition, concept, formula, diagram, and comparison mentioned.
+YOUR MISSION:
+Go through this document topic by topic and write notes that:
+- Cover EVERY SINGLE topic, EVERY definition, EVERY concept — absolutely nothing gets skipped
+- Are simplified enough to understand quickly but detailed enough to write correct exam answers
+- Include ALL diagrams, figures, charts, and tables recreated in text form
+- Feel like handwritten notes from the smartest student in class
 
-CRITICAL RULES:
-- Do NOT skip any topic no matter how small
-- Do NOT miss any definition — list ALL of them
-- Create detailed comparison tables wherever two or more things are being compared
-- Recreate any diagrams as ASCII art or structured text representations
-- Use real-world examples for EVERY concept
-- Write for a smart university student — detailed but clear
-
-Structure your notes EXACTLY like this:
-
-## 📌 Document Overview
-What this document covers, why each topic matters, and real-world applications.
-
-## 📚 Complete Topic Coverage
-
-For EVERY topic in the document create a section:
-
-### [Topic Name]
-**📖 Definition:** Clear complete definition
-
-**🔍 Detailed Explanation:**
-Thorough explanation. How it works, why it exists, what problem it solves.
-
-**💡 Real-World Example:**
-A concrete example from everyday life or industry that makes this click.
-
-**🔗 How It Connects:**
-How this topic relates to other concepts in the document.
+STRICT RULES:
+- Do NOT skip any topic — even small ones can appear in exams
+- Do NOT write "the document says..." — just write the content directly
+- Keep all technical terms but explain them clearly
+- ALWAYS give a real-world example for each concept
+- Cover ALL worked problems and examples from the document with full solutions
 
 ---
 
-## 📊 Comparison Tables
-For EVERY pair or group of concepts that can be compared, create a detailed table:
+Use this format for each topic:
 
-| Feature | Concept A | Concept B |
+## [Topic Name]
+
+[Write 2-4 paragraphs explaining this topic clearly. Keep all technical details but explain them in a way that is easy to understand and write in an exam.]
+
+**In simple terms:** [One sentence that captures the core idea]
+
+**Real-world example:** [A concrete relatable example]
+
+**Key definition to memorize:**
+> [Exact definition formatted as a blockquote]
+
+[Cover each subtopic with the same level of detail]
+
+---
+
+When you find a DIAGRAM or FIGURE recreate it:
+
+**📊 Figure: [Name]**
+[ASCII or text representation of the diagram]
+
+*What this shows: [Brief explanation of what the diagram means]*
+
+---
+
+When items are COMPARED create a table:
+
+**📊 Comparison: [Topic]**
+
+| Feature | [Option A] | [Option B] |
 |---------|-----------|-----------|
 | Definition | ... | ... |
 | How it works | ... | ... |
-| Use Case | ... | ... |
+| When to use | ... | ... |
 | Advantages | ... | ... |
 | Disadvantages | ... | ... |
 | Example | ... | ... |
 
-Create a separate table for every comparison in the document.
+---
 
-## 🔷 Diagrams & Visual Representations
-Recreate EVERY diagram, flowchart, or visual from the document.
+When you find FORMULAS or ALGORITHMS:
 
-For flowcharts use this format:
-For hierarchies use indented lists:
-## 🔑 Complete Definitions Glossary
-EVERY term defined in the document:
+**📐 Formula: [Name]**
 
-| Term | Definition | Example |
-|------|-----------|---------|
-| ... | ... | ... |
+[Formula written clearly]
 
-## 📐 Formulas, Algorithms & Rules
-For EVERY formula or algorithm:
-- Write it clearly
-- Explain each variable or component
-- Show a complete worked example step by step
-- State exactly when to use it
+Variables:
+- [Variable 1] = [what it means]
+- [Variable 2] = [what it means]
 
-## ⚠️ Common Exam Mistakes
-Specific mistakes students make on each topic with corrections.
+**Example:** [Worked example step by step]
 
-## 🎯 Expected Exam Questions & Model Answers
-10 likely exam questions covering ALL major topics with complete model answers.
+---
 
-## ✅ Complete Revision Checklist
-Every single concept the student must know before the exam.
+When you find WORKED PROBLEMS include them fully:
+
+**✏️ Problem: [Title]**
+
+Given: [what is given]
+
+Solution:
+- Step 1: [...]
+- Step 2: [...]
+
+Answer: [final answer]
+
+---
+
+After covering ALL topics add these final sections:
+
+## 📝 All Definitions at a Glance
+
+| Term | Definition |
+|------|-----------|
+| [every single term from document] | [clear definition] |
+
+## 🎯 What Will Definitely Come in the Exam
+[For each major topic write what type of question is likely to be asked]
+
+## ✅ Must-Know Before the Exam
+[Bullet list of the most critical points — one line each]
 
 ---
 Document Content:
 {doc_content}"""
 
-    # use images if extracted from PDF
+    # always use Gemini for summarization
+    # Gemini has bigger context window and larger output than Groq
     if image_paths:
         return call_ai_with_images(prompt, image_paths)
 
-    return call_ai(prompt, filepath=filepath)
+    return call_gemini(prompt)
 
 
 def chat(question, text=None, filepath=None):
@@ -263,7 +295,6 @@ Document Content:
 def generate_flashcards(text=None, filepath=None):
     """Generate exam-focused flashcards."""
     doc_content = text[:10000] if text else ""
-    # reduced to 10000 to stay within rate limits
 
     prompt = f"""You are an exam preparation expert creating flashcards for a university student.
 
@@ -279,11 +310,13 @@ Focus on:
 Rules for answers:
 - 2-3 sentences maximum per answer
 - Include a mini example where helpful
-- Make it clear enough to teach the concept
+- Make it clear enough to actually teach the concept
 
-Return ONLY a valid JSON array.
-No extra text, no explanation, no markdown.
-Start directly with [ and end with ]
+IMPORTANT: Return ONLY a valid JSON array.
+No extra text before or after.
+No markdown code blocks.
+No explanation.
+Start your response with [ and end with ]
 
 [{{"question": "...", "answer": "..."}}]
 
@@ -292,42 +325,21 @@ Document Content:
 
     raw = call_ai(prompt, filepath=filepath).strip()
 
-    # clean markdown if AI wraps in code blocks
-    if raw.startswith('```'):
-        raw = raw.split('```')[1]
-        if raw.startswith('json'):
-            raw = raw[4:]
+    # remove markdown code blocks if present
+    if '```' in raw:
+        parts = raw.split('```')
+        for part in parts:
+            part = part.strip()
+            if part.startswith('json'):
+                part = part[4:].strip()
+            if part.startswith('['):
+                raw = part
+                break
 
-    return json.loads(raw.strip())
+    # find the JSON array in the response
+    start = raw.find('[')
+    end = raw.rfind(']') + 1
+    if start != -1 and end > start:
+        raw = raw[start:end]
 
-def call_ai_with_images(prompt, image_paths):
-    """Send text prompt along with multiple images to Gemini."""
-    parts = [{'text': prompt}]
-
-    # add each image
-    for image_path in image_paths[:5]:
-        # limit to 5 images to avoid overloading
-        try:
-            with open(image_path, 'rb') as f:
-                image_data = base64.b64encode(f.read()).decode('utf-8')
-            ext = Path(image_path).suffix.lower().lstrip('.')
-            mime_type = 'image/jpeg' if ext in ['jpg', 'jpeg'] else f'image/{ext}'
-            parts.append({
-                'inline_data': {
-                    'mime_type': mime_type,
-                    'data': image_data
-                }
-            })
-        except Exception as e:
-            print(f"Could not add image {image_path}: {e}")
-
-    payload = {'contents': [{'parts': parts}]}
-    response = requests.post(GEMINI_URL, json=payload, timeout=120)
-    data = response.json()
-
-    if 'error' in data:
-        # fallback to text only if image sending fails
-        print(f"Image API error: {data['error']['message']} — falling back to text only")
-        return call_ai(prompt)
-
-    return data['candidates'][0]['content']['parts'][0]['text']
+    return json.loads(raw)
