@@ -264,6 +264,30 @@ Document Content:
 
     return call_gemini(prompt)
 
+def chat(question, text=None, filepath=None):
+    """Answer a question about the document like an expert tutor."""
+    doc_content = text[:20000] if text else ""
+
+    prompt = f"""You are an expert university tutor helping a student understand their study material.
+
+Answer this question thoroughly and clearly:
+
+Question: {question}
+
+Guidelines:
+- Give a detailed explanation — not just a one-line answer
+- Use a real-world example or analogy to make it memorable
+- If it involves calculation or steps, show them clearly
+- If it is conceptual, explain the WHY behind it
+- If relevant, mention how this connects to other topics
+- End with a "💡 Key Takeaway" that summarizes the core point in one line
+
+---
+Document Content:
+{doc_content}"""
+
+    return call_ai(prompt, filepath=filepath)
+
 
 def generate_flashcards(text=None, filepath=None):
     """Generate exam-focused flashcards."""
