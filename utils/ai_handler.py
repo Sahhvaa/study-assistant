@@ -135,6 +135,7 @@ def call_ai_with_images(prompt, image_paths):
             'temperature': 0.3
         }
     }
+
     response = requests.post(GEMINI_URL, json=payload, timeout=180)
     data = response.json()
 
@@ -145,115 +146,71 @@ def call_ai_with_images(prompt, image_paths):
     return data['candidates'][0]['content']['parts'][0]['text']
 
 
+# ─────────────────────────────────────────
+# MAIN FUNCTIONS
+# ─────────────────────────────────────────
+
 def summarize(text=None, filepath=None, image_paths=None, syllabus=None):
-    """Generate syllabus-focused exam-ready study notes using Gemini."""
+    """Generate comprehensive exam-ready study notes using Gemini."""
     doc_content = text[:80000] if text else ""
 
-    # build syllabus section of prompt
+    # build syllabus section
     if syllabus and syllabus.strip():
         syllabus_section = f"""
 SYLLABUS TO FOLLOW:
-The student's exam syllabus is provided below.
-ONLY cover topics that are mentioned in this syllabus.
-Ignore everything else in the document that is NOT in the syllabus.
+ONLY cover topics mentioned in this syllabus.
+Ignore everything in the document NOT in the syllabus.
 Give the most attention to topics that appear most prominently in the syllabus.
 
 {syllabus}
 
 ---"""
     else:
-        syllabus_section = """
-NOTE: No syllabus provided. Cover ALL topics in the document thoroughly.
----"""
+        syllabus_section = ""
 
-    prompt = f"""You are a brilliant senior student who just finished reading this entire document.
-You are now writing exam study notes for your classmates.
+    prompt = f"""You are an expert, empathetic AI Study Assistant designed to help students learn complex material easily. Your task is to analyze the provided source document and generate comprehensive, highly readable, and structured study notes.
 
 {syllabus_section}
 
-YOUR MISSION:
-- Cover EVERY topic mentioned in the syllabus thoroughly
-- Skip topics NOT in the syllabus
-- Write notes detailed enough to score full marks in an exam
-- Keep all technical terms but explain them clearly
-- ALWAYS give a real-world example for each concept
-- Include ALL diagrams, figures, charts, and tables from the document
+Follow these strict structural and formatting guidelines:
 
----
+1. TONE AND COMPLEXITY:
+   - Write in a clear, engaging, and easy-to-understand tone, as if explaining to a student who is new to the topic.
+   - Do not make the notes too short or summarized. Retain critical technical details, definitions, and explanations, but simplify the language.
 
-Use this format for each topic:
+2. STRUCTURE AND VISUALS:
+   - Use a clear hierarchy with Markdown headings (##, ###).
+   - Use bullet points, bold text for key terms, and horizontal rules (---) to separate major concepts to ensure maximum scannability.
+   - DIAGRAMS/GRAPHS: If the source document contains or heavily references specific diagrams, charts, or graphs, describe them vividly in a structured blockquote block explaining what the visual represents and its key data points.
+   - Format diagram descriptions like this:
+     > [Diagram Name]: Description of what it shows and its key components.
 
-## [Topic Name]
+3. COMPARATIVE ANALYSIS (CRITICAL):
+   - Identify the most crucial comparable topics, theories, or mechanisms within the text.
+   - Create a Markdown comparison table contrasting these elements based on relevant criteria such as Purpose, Mechanism, Pros/Cons, and Complexity.
 
-[Write 2-4 paragraphs explaining this topic clearly. Keep all technical details but explain them in a way that is easy to understand and write in an exam.]
+4. WORKED PROBLEMS:
+   - If the document contains solved problems or numerical examples, include them fully with all steps shown clearly.
+   - Format like this:
+     Problem: [statement]
+     Given: [values]
+     Solution: step by step
+     Answer: [final answer]
 
-**In simple terms:** [One sentence that captures the core idea]
+5. DEFINITIONS GLOSSARY:
+   - At the end, include a table of ALL key terms and their definitions.
+   - Format:
+     | Term | Definition |
+     |------|-----------|
+     | term | definition |
 
-**Real-world example:** [A concrete relatable example]
+6. EXAM PREPARATION:
+   - After the glossary, add a section called "What Will Come in the Exam" listing likely questions per topic.
+   - End with a "Must-Know Before the Exam" bullet checklist of the most critical points.
 
-**Key definition to memorize:**
-> [Exact definition formatted as a blockquote]
-
----
-
-When you find a DIAGRAM or FIGURE recreate it:
-
-**📊 Figure: [Name]**
-[ASCII or text representation of the diagram]
-*What this shows: [Brief explanation]*
-
----
-
-When items are COMPARED create a table:
-
-**📊 Comparison: [Topic]**
-
-| Feature | [Option A] | [Option B] |
-|---------|-----------|-----------|
-| Definition | ... | ... |
-| How it works | ... | ... |
-| When to use | ... | ... |
-| Advantages | ... | ... |
-| Disadvantages | ... | ... |
-| Example | ... | ... |
-
----
-
-When you find FORMULAS:
-
-**📐 Formula: [Name]**
-[Formula written clearly]
-Variables:
-- [Variable] = [meaning]
-
-**Example:** [Worked example step by step]
-
----
-
-When you find WORKED PROBLEMS include them fully:
-
-**✏️ Problem: [Title]**
-Given: [what is given]
-Solution:
-- Step 1: [...]
-- Step 2: [...]
-Answer: [final answer]
-
----
-
-After covering ALL syllabus topics add:
-
-## 📝 All Definitions at a Glance
-
-| Term | Definition |
-|------|-----------|
-| [every term covered] | [clear definition] |
-
-## 🎯 What Will Definitely Come in the Exam
-[For each syllabus topic write what type of question is likely]
-
-## ✅ Must-Know Before the Exam
-[Bullet list of most critical points]
+7. GUARDRAILS:
+   - Rely ONLY on the clear facts directly mentioned in the provided context. Do not assume, extrapolate, or bring in outside information.
+   - Anything not directly mentioned in the context is considered completely untruthful and unsupported.
 
 ---
 Document Content:
@@ -262,7 +219,9 @@ Document Content:
     if image_paths:
         return call_ai_with_images(prompt, image_paths)
 
+    # always use Gemini for summarization
     return call_gemini(prompt)
+
 
 def chat(question, text=None, filepath=None):
     """Answer a question about the document like an expert tutor."""
@@ -280,7 +239,7 @@ Guidelines:
 - If it involves calculation or steps, show them clearly
 - If it is conceptual, explain the WHY behind it
 - If relevant, mention how this connects to other topics
-- End with a "💡 Key Takeaway" that summarizes the core point in one line
+- End with a "Key Takeaway" that summarizes the core point in one line
 
 ---
 Document Content:
