@@ -216,3 +216,4 @@ wordcloud==1.9.6
 xlsxwriter==3.2.9
 zipp @ file:///home/conda/feedstock_root/build_artifacts/bld/rattler-build_zipp_1764460141/work
 zstandard @ file:///C:/miniconda3/conda-bld/zstandard_1758189089298/work
+gunicorn
