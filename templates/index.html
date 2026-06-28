@@ -71,16 +71,54 @@
     </div>
 
     <!-- RIGHT COLUMN — HISTORY -->
-    <div class="history-column">
-        <div class="card history-card">
+<div class="history-column">
+    <div class="card history-card">
+
+        <!-- HEADER with syllabus toggle button -->
+        <div class="history-header">
             <h2 class="history-title">📋 Recent Uploads</h2>
-            <div id="history-list">
-                <p class="empty-hint">No uploads yet.</p>
+            <button class="syllabus-toggle-btn"
+                id="syllabus-toggle"
+                onclick="toggleSyllabusPanel()"
+                title="Set exam syllabus">
+                + Syllabus
+            </button>
+        </div>
+
+        <!-- HISTORY LIST -->
+        <div id="history-list">
+            <p class="empty-hint">No uploads yet.</p>
+        </div>
+
+        <!-- SYLLABUS PANEL — hidden by default -->
+        <div id="syllabus-panel" style="display:none">
+            <div class="syllabus-divider"></div>
+
+            <div class="syllabus-panel-header">
+                <span>📋 Exam Syllabus</span>
+                <span id="syllabus-status"></span>
+            </div>
+
+            <textarea
+                id="syllabus-input"
+                class="syllabus-textarea-small"
+                placeholder="Paste your syllabus here..."></textarea>
+
+            <button class="btn btn-primary syllabus-save-btn"
+                id="save-syllabus-btn"
+                onclick="saveSyllabus()">
+                💾 Save
+            </button>
+
+            <div id="syllabus-error"
+                class="error-box"
+                style="display:none; margin-top:8px">
             </div>
         </div>
-    </div>
 
+    </div>
 </div>
+
 
 {% endblock %}
 
@@ -160,14 +198,29 @@ function uploadFile() {
 }
 
 // SYLLABUS
+function toggleSyllabusPanel() {
+    var panel = document.getElementById('syllabus-panel');
+    var btn = document.getElementById('syllabus-toggle');
+    var isOpen = panel.style.display !== 'none';
+
+    if (isOpen) {
+        panel.style.display = 'none';
+        btn.textContent = '+ Syllabus';
+        btn.classList.remove('active');
+    } else {
+        panel.style.display = 'block';
+        btn.textContent = '✕ Close';
+        btn.classList.add('active');
+    }
+}
+
 function loadSyllabus() {
     fetch('/get_syllabus')
     .then(function(r) { return r.json(); })
     .then(function(data) {
         if (data.syllabus && data.syllabus.trim()) {
             document.getElementById('syllabus-input').value = data.syllabus;
-            document.getElementById('syllabus-saved-bar').style.display = 'block';
-            document.getElementById('syllabus-edit-area').style.display = 'none';
+            document.getElementById('syllabus-status').textContent = '✅ Saved';
         }
     });
 }
@@ -176,7 +229,7 @@ function saveSyllabus() {
     var syllabus = document.getElementById('syllabus-input').value.trim();
 
     if (!syllabus) {
-        document.getElementById('syllabus-error').textContent = 'Please paste your syllabus first!';
+        document.getElementById('syllabus-error').textContent = 'Please paste your syllabus!';
         document.getElementById('syllabus-error').style.display = 'block';
         return;
     }
@@ -192,7 +245,7 @@ function saveSyllabus() {
     })
     .then(function(r) { return r.json(); })
     .then(function(data) {
-        btn.textContent = '💾 Save Syllabus';
+        btn.textContent = '💾 Save';
         btn.disabled = false;
 
         if (data.error) {
@@ -201,15 +254,16 @@ function saveSyllabus() {
             return;
         }
 
-        document.getElementById('syllabus-saved-bar').style.display = 'block';
-        document.getElementById('syllabus-edit-area').style.display = 'none';
+        // show saved status
+        document.getElementById('syllabus-status').textContent = '✅ Saved';
         document.getElementById('syllabus-error').style.display = 'none';
-    });
-}
 
-function toggleSyllabusEdit() {
-    document.getElementById('syllabus-edit-area').style.display = 'block';
-    document.getElementById('syllabus-saved-bar').style.display = 'none';
+        // close panel after saving
+        setTimeout(function() {
+            toggleSyllabusPanel();
+        }, 1000);
+        // closes after 1 second so user sees the success
+    });
 }
 
 // HISTORY
