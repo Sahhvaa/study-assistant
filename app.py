@@ -11,12 +11,16 @@ from utils.history_handler import (
     save_to_history, load_history,
     delete_from_history, get_entry
 )
+import tempfile
 
 load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'studyapp_secret_123')
-app.config['UPLOAD_FOLDER'] = 'uploads'
+if os.environ.get('RENDER'):
+    app.config['UPLOAD_FOLDER'] = '/tmp/uploads'
+else:
+    app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024
 
 SYLLABUS_FILE = 'data/syllabus.txt'
@@ -25,9 +29,6 @@ SYLLABUS_FILE = 'data/syllabus.txt'
 text_store = {}
 
 
-# ─────────────────────────────────────────
-# ERROR HANDLERS
-# ─────────────────────────────────────────
 
 @app.errorhandler(413)
 def file_too_large(e):
@@ -39,9 +40,6 @@ def not_found(e):
     return redirect(url_for('home'))
 
 
-# ─────────────────────────────────────────
-# PAGE ROUTES
-# ─────────────────────────────────────────
 
 @app.route('/')
 def home():
@@ -81,9 +79,6 @@ def flashcard_page():
     return render_template('flashcards.html', entry=entry)
 
 
-# ─────────────────────────────────────────
-# API ROUTES
-# ─────────────────────────────────────────
 
 @app.route('/upload', methods=['POST'])
 def upload():
@@ -267,9 +262,6 @@ def get_syllabus():
         return jsonify({'error': str(e)}), 500
 
 
-# ─────────────────────────────────────────
-# HELPER
-# ─────────────────────────────────────────
 
 def get_stored_data():
     """Get document data from memory or fall back to history."""
@@ -294,12 +286,10 @@ def get_stored_data():
     return stored
 
 
-# ─────────────────────────────────────────
-# RUN
-# ─────────────────────────────────────────
+
 
 if __name__ == '__main__':
-    os.makedirs('uploads', exist_ok=True)
+    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
     os.makedirs('data', exist_ok=True)
     app.run(debug=True, use_reloader=False)
 
