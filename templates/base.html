@@ -3,14 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-
     <title>{% block title %}Study Assistant{% endblock %} 📚</title>
-
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-
     <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
-
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
@@ -20,11 +15,11 @@
         <div class="nav-links">
             <a href="/" class="nav-link">Home</a>
             {% if session.get('entry_id') %}
-
             <a href="/summary" class="nav-link">Notes</a>
             <a href="/chat_page" class="nav-link">Ask AI</a>
             <a href="/flashcard_page" class="nav-link">Flashcards</a>
             {% endif %}
+            <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" title="Toggle dark/light mode">🌙</button>
         </div>
     </nav>
 
@@ -37,7 +32,6 @@
     </footer>
 
     <script src="{{ url_for('static', filename='script.js') }}"></script>
-
     {% block scripts %}{% endblock %}
 
 </body>

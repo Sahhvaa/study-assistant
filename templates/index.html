@@ -6,15 +6,12 @@
 
 <div class="page-grid">
 
-    <!-- LEFT COLUMN -->
+    <!-- LEFT COLUMN — UPLOAD -->
     <div class="upload-column">
 
-        <!-- UPLOAD CARD -->
         <div class="card">
             <h1 class="page-title">Upload Your File</h1>
-            <p class="page-subtitle">
-                Get AI-powered exam notes, Q&A, and flashcards
-            </p>
+            <p class="page-subtitle">Get AI-powered exam notes, Q&A, and flashcards</p>
 
             <div class="upload-area" id="upload-area"
                 onclick="document.getElementById('file-input').click()">
@@ -33,34 +30,6 @@
             <div id="upload-error" class="error-box" style="display:none"></div>
         </div>
 
-        <!-- SYLLABUS CARD -->
-        <div class="card syllabus-card">
-            <h2>📋 Exam Syllabus</h2>
-            <p class="page-subtitle">
-                Paste your syllabus so AI focuses only on exam topics
-            </p>
-
-            <div id="syllabus-saved-bar" style="display:none">
-                <div class="syllabus-saved">
-                    ✅ Syllabus saved — AI will focus on these topics
-                    <button class="edit-syllabus-btn" onclick="toggleSyllabusEdit()">
-                        Edit
-                    </button>
-                </div>
-            </div>
-
-            <div id="syllabus-edit-area">
-                <textarea id="syllabus-input" class="syllabus-textarea"
-                    placeholder="Paste your syllabus here..."></textarea>
-                <button class="btn btn-primary" onclick="saveSyllabus()"
-                    id="save-syllabus-btn">
-                    💾 Save Syllabus
-                </button>
-            </div>
-
-            <div id="syllabus-error" class="error-box" style="display:none"></div>
-        </div>
-
         <!-- LOADING CARD -->
         <div class="card loading-card" id="loading-card" style="display:none">
             <div class="spinner"></div>
@@ -70,61 +39,51 @@
 
     </div>
 
-    <!-- RIGHT COLUMN — HISTORY -->
-<div class="history-column">
-    <div class="card history-card">
+    <!-- RIGHT COLUMN — HISTORY + SYLLABUS -->
+    <div class="history-column">
+        <div class="card history-card">
 
-        <!-- HEADER with syllabus toggle button -->
-        <div class="history-header">
-            <h2 class="history-title">📋 Recent Uploads</h2>
-            <button class="syllabus-toggle-btn"
-                id="syllabus-toggle"
-                onclick="toggleSyllabusPanel()"
-                title="Set exam syllabus">
-                + Syllabus
-            </button>
-        </div>
-
-        <!-- HISTORY LIST -->
-        <div id="history-list">
-            <p class="empty-hint">No uploads yet.</p>
-        </div>
-
-        <!-- SYLLABUS PANEL — hidden by default -->
-        <div id="syllabus-panel" style="display:none">
-            <div class="syllabus-divider"></div>
-
-            <div class="syllabus-panel-header">
-                <span>📋 Exam Syllabus</span>
-                <span id="syllabus-status"></span>
+            <!-- HEADER -->
+            <div class="history-header">
+                <h2 class="history-title">📋 Recent Uploads</h2>
+                <button class="syllabus-toggle-btn" id="syllabus-toggle"
+                    onclick="toggleSyllabusPanel()" title="Set exam syllabus">
+                    + Syllabus
+                </button>
             </div>
 
-            <textarea
-                id="syllabus-input"
-                class="syllabus-textarea-small"
-                placeholder="Paste your syllabus here..."></textarea>
-
-            <button class="btn btn-primary syllabus-save-btn"
-                id="save-syllabus-btn"
-                onclick="saveSyllabus()">
-                💾 Save
-            </button>
-
-            <div id="syllabus-error"
-                class="error-box"
-                style="display:none; margin-top:8px">
+            <!-- HISTORY LIST -->
+            <div id="history-list">
+                <p class="empty-hint">No uploads yet. Upload a file to get started!</p>
             </div>
-        </div>
 
+            <!-- SYLLABUS PANEL -->
+            <div id="syllabus-panel" style="display:none">
+                <div class="syllabus-divider"></div>
+                <div class="syllabus-panel-header">
+                    <span>📋 Exam Syllabus</span>
+                    <span id="syllabus-status"></span>
+                </div>
+                <textarea id="syllabus-input" class="syllabus-textarea-small"
+                    placeholder="Paste your syllabus here...&#10;&#10;Example:&#10;Module 1: Foundations of Data Science&#10;- Introduction to Data Science&#10;- Properties of Data&#10;- Supervised and Unsupervised Learning"></textarea>
+                <button class="btn btn-primary syllabus-save-btn"
+                    id="save-syllabus-btn" onclick="saveSyllabus()">
+                    💾 Save Syllabus
+                </button>
+                <div id="syllabus-error" class="error-box" style="display:none; margin-top:8px"></div>
+            </div>
+
+        </div>
     </div>
-</div>
 
+</div>
 
 {% endblock %}
 
 {% block scripts %}
 <script>
-// FILE SELECTION
+
+// ===== FILE SELECTION =====
 document.getElementById('file-input').addEventListener('change', function () {
     var file = this.files[0];
     if (file) {
@@ -133,16 +92,19 @@ document.getElementById('file-input').addEventListener('change', function () {
     }
 });
 
-// DRAG AND DROP
+// ===== DRAG AND DROP =====
 var uploadArea = document.getElementById('upload-area');
-uploadArea.addEventListener('dragover', function(e) {
+
+uploadArea.addEventListener('dragover', function (e) {
     e.preventDefault();
     uploadArea.classList.add('drag-over');
 });
-uploadArea.addEventListener('dragleave', function() {
+
+uploadArea.addEventListener('dragleave', function () {
     uploadArea.classList.remove('drag-over');
 });
-uploadArea.addEventListener('drop', function(e) {
+
+uploadArea.addEventListener('drop', function (e) {
     e.preventDefault();
     uploadArea.classList.remove('drag-over');
     var file = e.dataTransfer.files[0];
@@ -155,7 +117,7 @@ uploadArea.addEventListener('drop', function(e) {
     }
 });
 
-// FILE UPLOAD
+// ===== FILE UPLOAD =====
 function uploadFile() {
     var fileInput = document.getElementById('file-input');
     var file = fileInput.files[0];
@@ -177,19 +139,19 @@ function uploadFile() {
         method: 'POST',
         body: formData
     })
-    .then(function(response) {
+    .then(function (response) {
         if (response.status === 413) {
             throw new Error('File too large! Maximum size is 50MB.');
         }
         return response.json();
     })
-    .then(function(data) {
+    .then(function (data) {
         if (data.error) {
             throw new Error(data.error);
         }
         window.location.href = '/summary';
     })
-    .catch(function(error) {
+    .catch(function (error) {
         document.getElementById('loading-card').style.display = 'none';
         document.getElementById('upload-btn').disabled = false;
         document.getElementById('upload-btn').textContent = '✨ Summarize & Study';
@@ -197,7 +159,7 @@ function uploadFile() {
     });
 }
 
-// SYLLABUS
+// ===== SYLLABUS =====
 function toggleSyllabusPanel() {
     var panel = document.getElementById('syllabus-panel');
     var btn = document.getElementById('syllabus-toggle');
@@ -216,8 +178,8 @@ function toggleSyllabusPanel() {
 
 function loadSyllabus() {
     fetch('/get_syllabus')
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
         if (data.syllabus && data.syllabus.trim()) {
             document.getElementById('syllabus-input').value = data.syllabus;
             document.getElementById('syllabus-status').textContent = '✅ Saved';
@@ -229,7 +191,7 @@ function saveSyllabus() {
     var syllabus = document.getElementById('syllabus-input').value.trim();
 
     if (!syllabus) {
-        document.getElementById('syllabus-error').textContent = 'Please paste your syllabus!';
+        document.getElementById('syllabus-error').textContent = 'Please paste your syllabus first!';
         document.getElementById('syllabus-error').style.display = 'block';
         return;
     }
@@ -243,9 +205,9 @@ function saveSyllabus() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ syllabus: syllabus })
     })
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-        btn.textContent = '💾 Save';
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+        btn.textContent = '💾 Save Syllabus';
         btn.disabled = false;
 
         if (data.error) {
@@ -254,23 +216,20 @@ function saveSyllabus() {
             return;
         }
 
-        // show saved status
         document.getElementById('syllabus-status').textContent = '✅ Saved';
         document.getElementById('syllabus-error').style.display = 'none';
 
-        // close panel after saving
-        setTimeout(function() {
+        setTimeout(function () {
             toggleSyllabusPanel();
         }, 1000);
-        // closes after 1 second so user sees the success
     });
 }
 
-// HISTORY
+// ===== HISTORY =====
 function loadHistory() {
     fetch('/history')
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
         var list = document.getElementById('history-list');
 
         if (!data.history || data.history.length === 0) {
@@ -281,7 +240,7 @@ function loadHistory() {
         var items = data.history.slice().reverse();
         list.innerHTML = '';
 
-        items.forEach(function(entry) {
+        items.forEach(function (entry) {
             var item = document.createElement('div');
             item.className = 'history-item';
             item.innerHTML =
@@ -301,8 +260,8 @@ function loadEntry(id) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: id })
     })
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
         if (data.error) {
             alert('Error: ' + data.error);
             return;
@@ -319,15 +278,13 @@ function deleteEntry(id) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: id })
     })
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-        if (data.success) {
-            loadHistory();
-        }
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+        if (data.success) { loadHistory(); }
     });
 }
 
-// HELPERS
+// ===== HELPERS =====
 function showUploadError(message) {
     var box = document.getElementById('upload-error');
     box.textContent = '❌ ' + message;
@@ -338,10 +295,11 @@ function hideUploadError() {
     document.getElementById('upload-error').style.display = 'none';
 }
 
-// INIT
-window.onload = function() {
+// ===== INIT =====
+window.onload = function () {
     loadHistory();
     loadSyllabus();
 };
+
 </script>
 {% endblock %}
